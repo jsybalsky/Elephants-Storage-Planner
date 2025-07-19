@@ -254,9 +254,27 @@
 
           const sortedObjects = useMemo(() => {
             return [...objects].sort((a, b) => {
+              // First sort by taxa
               if (a.taxa !== b.taxa) return a.taxa.localeCompare(b.taxa);
-              if (sortMode === "catalog") return a.catalog.localeCompare(b.catalog);
-              return b.height - a.height;
+              
+              // Then sort by selected criteria
+              if (sortMode === "catalog") {
+                // Extract numbers from catalog for better sorting
+                const getNumericPart = (catalog) => {
+                  const match = catalog.match(/\d+/);
+                  return match ? parseInt(match[0]) : 0;
+                };
+                const numA = getNumericPart(a.catalog);
+                const numB = getNumericPart(b.catalog);
+                
+                // If both have numbers, sort numerically
+                if (numA && numB) return numA - numB;
+                // Otherwise sort alphabetically
+                return a.catalog.localeCompare(b.catalog);
+              } else {
+                // Sort by height - smallest to largest
+                return a.height - b.height;
+              }
             });
           }, [objects, sortMode]);
 
@@ -437,8 +455,8 @@
                 key={obj.id}
                 style={baseStyle}
                 onMouseDown={(e) => handleMouseDown(e, obj, isPlaced)}
-                onDoubleClick={() => startEditing(obj.id)}
-                title={`${obj.catalog} (${obj.height}"H x ${obj.width}"W x ${obj.depth}"D) - Double-click to edit`}
+                onDoubleClick={() => (obj.type === "crania" || obj.type === "allskull") ? startEditing(obj.id) : null}
+                title={`${obj.catalog} (${obj.height}"H x ${obj.width}"W x ${obj.depth}"D)${(obj.type === "crania" || obj.type === "allskull") ? " - Double-click to edit" : ""}`}
               >
                 <div style={{
                   fontWeight: "bold",
@@ -463,26 +481,28 @@
                   )}
                 </div>
                 <div style={{ display: "flex", gap: 4, alignSelf: "flex-end" }}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      startEditing(obj.id);
-                    }}
-                    style={{
-                      fontSize: 11,
-                      cursor: "pointer",
-                      padding: "1px 4px",
-                      border: "1px solid",
-                      borderColor: textColor === "#fff" ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.2)",
-                      background: textColor === "#fff" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
-                      color: textColor,
-                      borderRadius: "3px",
-                      lineHeight: 1
-                    }}
-                    title="Edit properties"
-                  >
-                    ✏️
-                  </button>
+                  {(obj.type === "crania" || obj.type === "allskull") && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEditing(obj.id);
+                      }}
+                      style={{
+                        fontSize: 11,
+                        cursor: "pointer",
+                        padding: "1px 4px",
+                        border: "1px solid",
+                        borderColor: textColor === "#fff" ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.2)",
+                        background: textColor === "#fff" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
+                        color: textColor,
+                        borderRadius: "3px",
+                        lineHeight: 1
+                      }}
+                      title="Edit properties"
+                    >
+                      ✏️
+                    </button>
+                  )}
                   {obj.canRotate && !isDragging && (
                     <button
                       onClick={(e) => {
