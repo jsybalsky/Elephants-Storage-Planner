@@ -39,6 +39,7 @@
           const [draggedObject, setDraggedObject] = useState(null);
           const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
           const [sortMode, setSortMode] = useState("catalog"); // 'catalog' or 'height'
+          const [editingObject, setEditingObject] = useState(null); // Track which object is being edited
           const fileInputRef = useRef(null);
 
           const colors = {
@@ -175,6 +176,10 @@
 
           const handleMouseDown = (e, object, isPlaced = false) => {
             e.preventDefault();
+            
+            // Don't start drag if we're editing
+            if (editingObject) return;
+            
             const rect = e.currentTarget.getBoundingClientRect();
             
             // Store the initial position and mouse offset
@@ -326,7 +331,29 @@
             transform: "translateY(-1px)",
           };
 
-          const exportReport = () => {
+          const updateObjectProperties = (objectId, updates) => {
+            // Update in library
+            setObjects((prev) =>
+              prev.map((obj) =>
+                obj.id === objectId ? { ...obj, ...updates } : obj
+              )
+            );
+            
+            // Update in placed objects
+            setPlacedObjects((prev) =>
+              prev.map((obj) =>
+                obj.id === objectId ? { ...obj, ...updates } : obj
+              )
+            );
+          };
+
+          const startEditing = (objectId) => {
+            setEditingObject(objectId);
+          };
+
+          const stopEditing = () => {
+            setEditingObject(null);
+          };
             // Create HTML content for the new window
             let htmlContent = `
               <!DOCTYPE html>
@@ -489,13 +516,14 @@
 
             // Check if object is rotated (width > depth means it was rotated from original orientation)
             const isRotated = obj.width > obj.depth;
+            const isEditing = editingObject === obj.id;
 
             const baseStyle = {
               width: widthPx,
               height: depthPx,
               backgroundColor: colors[obj.taxa]?.[obj.type] || "#ccc",
-              border: "1px solid black",
-              cursor: "grab",
+              border: isEditing ? "2px solid #ff6b6b" : "1px solid black",
+              cursor: isEditing ? "default" : "grab",
               userSelect: "none",
               padding: 4,
               boxSizing: "border-box",
@@ -506,7 +534,7 @@
               justifyContent: "space-between",
               margin: isLibrary ? 4 : 0,
               borderRadius: 4,
-              boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+              boxShadow: isEditing ? "0 0 8px rgba(255,107,107,0.5)" : "0 1px 3px rgba(0,0,0,0.2)",
               position: isLibrary ? "static" : "absolute",
               left: !isLibrary && isPlaced ? obj.x : undefined,
               top: !isLibrary && isPlaced ? obj.y : undefined,
@@ -514,12 +542,115 @@
               overflow: "hidden",
             };
 
+            if (isEditing) {
+              return (
+                <div
+                  key={obj.id}
+                  style={baseStyle}
+                  title="Editing mode - Click outside or press Done to finish"
+                >
+                  <div style={{ fontSize: 9, fontWeight: "bold" }}>
+                    {obj.catalog}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <select
+                      value={obj.taxa}
+                      onChange={(e) => updateObjectProperties(obj.id, { taxa: e.target.value })}
+                      style={{
+                        fontSize: 8,
+                        padding: "1px 2px",
+                        border: "1px solid #ccc",
+                        borderRadius: 2,
+                        backgroundColor: textColor === "#fff" ? "rgba(255,255,255,0.2)" : "white",
+                        color: textColor === "#fff" ? "white" : "black",
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <option value="Loxodonta" style={{color: "black"}}>Loxodonta</option>
+                      <option value="Elephas" style={{color: "black"}}>Elephas</option>
+                      <option value="Other" style={{color: "black"}}>Other</option>
+                    </select>
+                    <div style={{ display: "flex", gap: 2 }}>
+                      <input
+                        type="number"
+                        value={obj.height}
+                        onChange={(e) => updateObjectProperties(obj.id, { height: parseFloat(e.target.value) || 1 })}
+                        style={{
+                          width: "25%",
+                          fontSize: 8,
+                          padding: "1px",
+                          border: "1px solid #ccc",
+                          borderRadius: 2,
+                          backgroundColor: textColor === "#fff" ? "rgba(255,255,255,0.2)" : "white",
+                          color: textColor === "#fff" ? "white" : "black",
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        title="Height"
+                      />
+                      <input
+                        type="number"
+                        value={obj.width}
+                        onChange={(e) => updateObjectProperties(obj.id, { width: parseFloat(e.target.value) || 1 })}
+                        style={{
+                          width: "25%",
+                          fontSize: 8,
+                          padding: "1px",
+                          border: "1px solid #ccc",
+                          borderRadius: 2,
+                          backgroundColor: textColor === "#fff" ? "rgba(255,255,255,0.2)" : "white",
+                          color: textColor === "#fff" ? "white" : "black",
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        title="Width"
+                      />
+                      <input
+                        type="number"
+                        value={obj.depth}
+                        onChange={(e) => updateObjectProperties(obj.id, { depth: parseFloat(e.target.value) || 1 })}
+                        style={{
+                          width: "25%",
+                          fontSize: 8,
+                          padding: "1px",
+                          border: "1px solid #ccc",
+                          borderRadius: 2,
+                          backgroundColor: textColor === "#fff" ? "rgba(255,255,255,0.2)" : "white",
+                          color: textColor === "#fff" ? "white" : "black",
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        title="Depth"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      stopEditing();
+                    }}
+                    style={{
+                      fontSize: 10,
+                      padding: "2px 6px",
+                      border: "1px solid",
+                      borderColor: textColor === "#fff" ? "rgba(255,255,255,0.5)" : "#666",
+                      background: textColor === "#fff" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)",
+                      color: textColor,
+                      borderRadius: "3px",
+                      cursor: "pointer",
+                      alignSelf: "center",
+                    }}
+                  >
+                    Done
+                  </button>
+                </div>
+              );
+            }
+
             return (
               <div
                 key={obj.id}
                 style={baseStyle}
                 onMouseDown={(e) => handleMouseDown(e, obj, isPlaced)}
-                title={`${obj.catalog} (${obj.height}"H x ${obj.width}"W x ${obj.depth}"D)`}
+                onDoubleClick={() => startEditing(obj.id)}
+                title={`${obj.catalog} (${obj.height}"H x ${obj.width}"W x ${obj.depth}"D) - Double-click to edit`}
               >
                 <div
                   style={{
@@ -547,23 +678,16 @@
                     <span>{obj.width.toFixed(0)}×{obj.depth.toFixed(0)}</span>
                   )}
                 </div>
-                {obj.canRotate && !isDragging && (
+                <div style={{ display: "flex", gap: 4, alignSelf: "flex-end" }}>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      e.preventDefault();
-                      console.log('Rotate clicked for:', obj.id, 'isPlaced:', isPlaced);
-                      rotateObject(obj.id);
-                    }}
-                    onMouseDown={(e) => {
-                      e.stopPropagation();
+                      startEditing(obj.id);
                     }}
                     style={{
-                      alignSelf: "flex-end",
-                      fontSize: isRotated && depthPx < 50 ? 12 : 14,
+                      fontSize: 11,
                       cursor: "pointer",
-                      padding: isRotated && depthPx < 50 ? "1px 4px" : "2px 6px",
-                      marginTop: 2,
+                      padding: "1px 4px",
                       border: "1px solid",
                       borderColor: textColor === "#fff" ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.2)",
                       background: textColor === "#fff" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
@@ -571,8 +695,6 @@
                       borderRadius: "3px",
                       transition: "all 0.2s ease",
                       lineHeight: 1,
-                      zIndex: 10,
-                      position: "relative",
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = textColor === "#fff" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)";
@@ -580,11 +702,47 @@
                     onMouseLeave={(e) => {
                       e.currentTarget.style.background = textColor === "#fff" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)";
                     }}
-                    title="Rotate"
+                    title="Edit properties"
                   >
-                    ↻
+                    ✏️
                   </button>
-                )}
+                  {obj.canRotate && !isDragging && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        rotateObject(obj.id);
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                      }}
+                      style={{
+                        alignSelf: "flex-end",
+                        fontSize: isRotated && depthPx < 50 ? 12 : 14,
+                        cursor: "pointer",
+                        padding: isRotated && depthPx < 50 ? "1px 4px" : "2px 6px",
+                        border: "1px solid",
+                        borderColor: textColor === "#fff" ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.2)",
+                        background: textColor === "#fff" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
+                        color: textColor,
+                        borderRadius: "3px",
+                        transition: "all 0.2s ease",
+                        lineHeight: 1,
+                        zIndex: 10,
+                        position: "relative",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = textColor === "#fff" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = textColor === "#fff" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)";
+                      }}
+                      title="Rotate"
+                    >
+                      ↻
+                    </button>
+                  )}
+                </div>
               </div>
             );
           };
@@ -657,6 +815,10 @@
                 `,
                 position: "relative",
                 overflow: "hidden",
+              }}
+              onClick={() => {
+                // Exit edit mode when clicking outside
+                if (editingObject) stopEditing();
               }}
             >
               {/* Background elephant silhouettes */}
